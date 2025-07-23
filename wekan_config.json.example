@@ -1,0 +1,34 @@
+{
+  "wekan_url": "http://localhost:8088",
+  "credentials": {
+    "username": "your_wekan_username",
+    "password": "your_wekan_password"
+  },
+  "github": {
+    "token": "your_github_personal_access_token",
+    "webhook_secret": "your_webhook_secret",
+    "base_url": "https://api.github.com"
+  },
+  "webhook_service": {
+    "host": "0.0.0.0",
+    "port": 5000,
+    "debug": false
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "wekan_project.log",
+    "max_size": "10MB",
+    "backup_count": 5
+  },
+  "sync_settings": {
+    "auto_create_boards": true,
+    "default_template": "kanban_basic",
+    "sync_comments": true,
+    "sync_labels": true,
+    "close_issues_on_done": true
+  },
+  "rate_limiting": {
+    "github_api_calls_per_hour": 5000,
+    "wekan_api_calls_per_minute": 100
+  }
+}
