@@ -11,10 +11,10 @@ pytest-cov>=4.0.0
 black>=22.0.0
 flake8>=5.0.0
 
-# Future dependencies for webhook service
-flask>=2.2.0
+# Webhook service dependencies (now implemented)
+flask>=3.1.0
 gunicorn>=20.1.0
-python-dotenv>=0.19.0
+python-dotenv>=1.0.0
 
 # Future dependencies for GitHub integration
 PyGithub>=1.55.0
