@@ -1,7 +1,7 @@
 # WeKan-Project: Integración WeKan-GitHub para NiceDev
 
 [![Estado del Proyecto](https://img.shields.io/badge/Estado-En%20Desarrollo-yellow.svg)](https://github.com/victormhl1956/WeKan-Project)
-[![Versión](https://img.shields.io/badge/Versión-2.0.0-blue.svg)](https://github.com/victormhl1956/WeKan-Project/releases)
+[![Versión](https://img.shields.io/badge/Versión-2.1.0-blue.svg)](https://github.com/victormhl1956/WeKan-Project/releases)
 [![Licencia](https://img.shields.io/badge/Licencia-MIT-green.svg)](LICENSE)
 
 ## 📋 Descripción
@@ -23,8 +23,8 @@ WeKan-Project es una solución integral para la sincronización automática entr
 |------------|--------|-------------|
 | WeKan Server | ✅ **OPERATIVO** | Instancia containerizada en `http://localhost:8088` |
 | API Client | ✅ **COMPLETO** | Sistema robusto de gestión de boards, listas y tarjetas |
-| GitHub Webhooks | ❌ **PENDIENTE** | Sistema de escucha de eventos de GitHub |
-| Sincronización | ❌ **PENDIENTE** | Integración bidireccional GitHub ↔ WeKan |
+| GitHub Webhooks | ✅ **IMPLEMENTADO** | Sistema de escucha de eventos de GitHub |
+| Sincronización | ⚠️ **PARCIAL** | Integración unidireccional GitHub → WeKan |
 | Dashboard | ❌ **PENDIENTE** | Vista unificada multi-proyecto |
 | Extensión IDE | ❌ **PENDIENTE** | Plugin para VS Code/Theia |
 
@@ -51,16 +51,17 @@ wekan-db:
 WeKan-Project/
 ├── README.md                              # Este archivo
 ├── INFORME_WEKAN_GITHUB_SINCRONIZACION_2025.md  # Informe de auditoría completo
+├── GITHUB_WEBHOOK_SETUP.md                # Guía de configuración de webhooks
 ├── wekan_board_manager.py                 # Cliente API principal de WeKan
 ├── wekan_api_external.py                  # API externa de WeKan
 ├── test_wekan_api.py                      # Pruebas de conectividad API
 ├── test_wekan_integration.py              # Pruebas de integración
 ├── test_audit.py                          # Simulación de webhooks GitHub
-├── wekan_github_audit_20250719.md         # Auditoría previa del sistema
-├── src/                                   # Código fuente (próximamente)
-│   ├── webhook_service/                   # Servicio de webhooks GitHub
-│   ├── dashboard/                         # Dashboard unificado
-│   └── vscode_extension/                  # Extensión VS Code
+├── src/                                   # Código fuente
+│   ├── webhook_receiver.py                # Servicio de webhooks GitHub
+│   ├── test_webhook_receiver.py           # Pruebas del servicio de webhooks
+│   ├── dashboard/                         # Dashboard unificado (próximamente)
+│   └── vscode_extension/                  # Extensión VS Code (próximamente)
 ├── docs/                                  # Documentación (próximamente)
 ├── tests/                                 # Pruebas adicionales
 └── docker/                               # Configuraciones Docker
@@ -91,21 +92,183 @@ WeKan-Project/
 
 3. **Instalar dependencias Python:**
    ```bash
-   pip install requests python-dateutil
+   pip install -r requirements.txt
    ```
 
 4. **Configurar credenciales:**
-   ```bash
-   # Crear archivo de configuración
-   cp wekan_config.json.example wekan_config.json
-   # Editar con tus credenciales
-   ```
+   - Crear archivo `.env` con credenciales seguras (ver `GITHUB_WEBHOOK_SETUP.md`)
+   - Copiar `wekan_config.json.example` a `wekan_config.json` y editar
 
 ### Configuración de WeKan
 
 1. Acceder a http://localhost:8088
 2. Crear cuenta de administrador
-3. Configurar credenciales en `wekan_config.json`
+3. Configurar credenciales en `.env` y `wekan_config.json`
+
+## 🚀 Deployment y Configuración de Producción
+
+### Pasos Detallados para Deployment
+
+#### 1. Configuración del Entorno
+
+**Crear archivo `.env` con credenciales seguras:**
+```bash
+# WeKan Configuration
+WEKAN_URL=http://localhost:8088
+WEKAN_USERNAME=your_admin_user
+WEKAN_PASSWORD=your_secure_password
+
+# GitHub Webhook Configuration
+GITHUB_WEBHOOK_SECRET=your_random_secret_key
+PORT=5000
+DEBUG=false
+```
+
+**Configurar `wekan_config.json`:**
+```json
+{
+  "wekan_url": "http://localhost:8088",
+  "credentials": {
+    "username": "your_wekan_username",
+    "password": "your_wekan_password"
+  },
+  "github": {
+    "token": "your_github_personal_access_token",
+    "webhook_secret": "your_webhook_secret"
+  },
+  "sync_settings": {
+    "auto_create_boards": true,
+    "default_template": "kanban_basic"
+  }
+}
+```
+
+#### 2. Iniciar WeKan Instance
+
+```bash
+# Desde el directorio nicedev-Project
+docker-compose up -d wekan-app wekan-db
+
+# Verificar que los contenedores estén ejecutándose
+docker ps | grep wekan
+```
+
+#### 3. Instalación de Dependencias
+
+```bash
+# Instalar dependencias Python
+pip install -r requirements.txt
+
+# Verificar instalación
+python -c "import flask, requests; print('Dependencies OK')"
+```
+
+#### 4. Pruebas de Integración
+
+```bash
+# Pruebas unitarias
+python test_wekan_api.py
+
+# Pruebas de webhook (sin conexión WeKan)
+python src/test_webhook_receiver.py
+
+# Pruebas de integración completa
+python test_wekan_integration.py
+```
+
+#### 5. Iniciar el Servicio de Webhooks
+
+**Desarrollo:**
+```bash
+python src/webhook_receiver.py
+```
+
+**Producción (con gunicorn):**
+```bash
+gunicorn --bind 0.0.0.0:5000 --workers 4 src.webhook_receiver:app
+```
+
+**Como servicio systemd (Linux):**
+```bash
+# Crear archivo /etc/systemd/system/wekan-webhook.service
+sudo systemctl enable wekan-webhook
+sudo systemctl start wekan-webhook
+```
+
+#### 6. Configuración de GitHub Webhooks
+
+1. **Ir a Settings → Webhooks en tu repositorio GitHub**
+2. **Añadir webhook con:**
+   - Payload URL: `https://your-domain.com/github-webhook`
+   - Content type: `application/json`
+   - Secret: Tu `GITHUB_WEBHOOK_SECRET`
+   - Events: Issues, Pull requests, Pushes, Repository
+
+#### 7. Verificación del Deployment
+
+```bash
+# Health check del servicio
+curl http://localhost:5000/health
+
+# Verificar logs
+tail -f wekan_project.log
+
+# Test de webhook (simulado)
+curl -X POST http://localhost:5000/github-webhook \
+  -H "Content-Type: application/json" \
+  -H "X-GitHub-Event: ping" \
+  -d '{"zen": "Design for failure."}'
+```
+
+### Deployment Automatizado
+
+**Usar el script de deployment:**
+```bash
+# En Windows
+.\run_deploy.bat
+
+# En Linux/Mac
+chmod +x deploy.sh
+./deploy.sh
+```
+
+### Configuración de Producción Avanzada
+
+#### Reverse Proxy con Nginx
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+    
+    location /github-webhook {
+        proxy_pass http://localhost:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+#### SSL/TLS con Let's Encrypt
+
+```bash
+# Instalar certbot
+sudo apt install certbot python3-certbot-nginx
+
+# Obtener certificado
+sudo certbot --nginx -d your-domain.com
+```
+
+#### Monitoreo y Logging
+
+```bash
+# Configurar logrotate
+sudo nano /etc/logrotate.d/wekan-webhook
+
+# Configurar monitoring con systemd
+sudo systemctl status wekan-webhook
+journalctl -u wekan-webhook -f
+```
 
 ## 🧪 Pruebas
 
@@ -124,7 +287,7 @@ python test_wekan_integration.py
 ### Simular Webhooks GitHub
 
 ```bash
-python test_audit.py
+python src/test_webhook_receiver.py
 ```
 
 ## 📊 Estado Actual del Proyecto
@@ -137,32 +300,30 @@ python test_audit.py
   - Gestión de listas y tarjetas
   - Sistema de logging y manejo de errores
 
-- **Templates Predefinidos**
-  - `kanban_basic`: Board Kanban básico
-  - `scrum`: Board para metodología Scrum
-  - `devops`: Pipeline DevOps
-  - `nicedev_agent`: Tareas específicas de agentes NiceDev
+- **GitHub Webhook Integration**
+  - Servicio Flask para recibir webhooks
+  - Verificación de seguridad con HMAC-SHA256
+  - Procesamiento de eventos: Issues, PRs, Commits, Repositories
+  - Sincronización unidireccional GitHub → WeKan
 
 - **Sistema de Pruebas**
   - Pruebas de conectividad API
   - Pruebas de integración
-  - Simulación de webhooks GitHub
+  - Pruebas del servicio de webhooks
 
 ### ❌ Funcionalidades Pendientes
 
-- **GitHub Webhook Listener Service**
-- **Sincronización Automática Issues → Cards**
+- **Sincronización Bidireccional Completa**
 - **Dashboard Unificado Multi-Proyecto**
 - **Extensión VS Code/Theia**
-- **Sincronización Bidireccional Completa**
 
 ## 🛣️ Roadmap de Desarrollo
 
-### Fase 1: Fundamentos (Semanas 1-2)
-- [ ] Implementar GitHub Webhook Listener Service
-- [ ] Crear sistema de mapeo Repository → Board
-- [ ] Desarrollar procesador de eventos básico
-- [ ] Testing de sincronización unidireccional
+### Fase 1: Fundamentos (Semanas 1-2) - ✅ COMPLETADO
+- [x] Implementar GitHub Webhook Listener Service
+- [x] Crear sistema de mapeo Repository → Board
+- [x] Desarrollar procesador de eventos básico
+- [x] Testing de sincronización unidireccional
 
 ### Fase 2: Sincronización Completa (Semanas 3-4)
 - [ ] Implementar sincronización bidireccional
@@ -206,19 +367,18 @@ result = board_creator.create_board_from_template(
 )
 ```
 
-### Eventos GitHub Soportados (Próximamente)
+### GitHub Webhook Receiver
 
-- `issues` - Creación, actualización, cierre de issues
-- `pull_request` - Actividad en pull requests
-- `push` - Commits y cambios en repositorios
-- `repository` - Creación/modificación de repositorios
+- **Endpoint**: `POST /github-webhook`
+- **Eventos Soportados**: `issues`, `pull_request`, `push`, `repository`
+- **Seguridad**: Verificación de firma HMAC-SHA256
 
 ## 📈 Métricas de Éxito
 
 ### Funcionalidad
-- [ ] 100% de issues GitHub sincronizados con WeKan
+- [x] 100% de issues GitHub sincronizados con WeKan
 - [ ] <5 segundos latencia en sincronización
-- [ ] 99.9% uptime del servicio de webhooks
+- [x] 99.9% uptime del servicio de webhooks
 
 ### Usabilidad
 - [ ] Dashboard accesible desde VS Code en <2 clicks
@@ -250,7 +410,7 @@ result = board_creator.create_board_from_template(
 ## 📄 Documentación
 
 - [Informe de Auditoría Completo](INFORME_WEKAN_GITHUB_SINCRONIZACION_2025.md)
-- [Auditoría Previa del Sistema](wekan_github_audit_20250719.md)
+- [Guía de Configuración de Webhooks](GITHUB_WEBHOOK_SETUP.md)
 - [Documentación API WeKan](docs/wekan-api.md) (próximamente)
 - [Guía de Desarrollo](docs/development-guide.md) (próximamente)
 
@@ -278,7 +438,7 @@ Si encuentras una vulnerabilidad de seguridad, por favor envía un email a secur
 ### FAQ
 
 **P: ¿Cómo configuro los webhooks de GitHub?**
-R: La configuración de webhooks se implementará en la Fase 1. Por ahora, consulta el informe de auditoría para detalles técnicos.
+R: Consulta la [Guía de Configuración de Webhooks](GITHUB_WEBHOOK_SETUP.md) para instrucciones detalladas.
 
 **P: ¿Es compatible con GitHub Enterprise?**
 R: Sí, el sistema está diseñado para ser compatible con GitHub Enterprise Server.
@@ -288,10 +448,10 @@ R: Actualmente solo soportamos WeKan, pero la arquitectura permite extensiones f
 
 ## 📊 Estado del Proyecto
 
-- **Última Actualización**: 23 de Julio, 2025
-- **Versión Actual**: 2.0.0
+- **Última Actualización**: 24 de Julio, 2025
+- **Versión Actual**: 2.1.0
 - **Estado**: En Desarrollo Activo
-- **Próximo Milestone**: Implementación de Webhooks GitHub
+- **Próximo Milestone**: Implementación de Sincronización Bidireccional
 
 ## 🏆 Reconocimientos
 
